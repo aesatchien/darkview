@@ -1,3 +1,22 @@
+"""
+flask_server.py  - 20250412 CJH
+
+Flask-based web server for live viewing of camera and fusion output.
+Provides buttons for switching view modes and triggering cam2 exposure tuning.
+
+Endpoints:
+- '/'                : HTML page with view and tuning controls.
+- '/stream'          : MJPEG video stream of cam1, cam2, or fusion.
+- '/set_mode'        : Switches active view mode (cam1, cam2, fusion).
+- '/tune_cam2_exposure': Temporarily pauses cam2 and runs exposure tuning.
+
+Functions:
+- update_cam1, update_cam2, update_fusion: Thread-safe setters for updating shared image dictionaries.
+Globals:
+- cam1_data, cam2_data, fusion_data: Shared frame dictionaries accessed by the stream handler.
+- data_lock: Ensures atomic access to shared data across threads.
+"""
+
 from flask import Flask, Response, render_template_string, request
 import threading
 import time
@@ -77,7 +96,7 @@ def stream():
                 if ret:
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-            time.sleep(0.03)  # ~30 FPS
+            time.sleep(0.03)  # ~30 FPS cap
 
     return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 

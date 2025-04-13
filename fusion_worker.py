@@ -1,3 +1,15 @@
+"""
+fusion_worker.py  - 20250412 CJH
+
+Defines the FusionWorker class, which fuses synchronized frames from cam1 and cam2.
+It trims overlap, applies mask-based pixel replacement, draws outlines from both masks,
+and pads the result to full resolution.
+
+Class:
+- FusionWorker: Thread that waits for time-synced cam1/cam2 frames, performs fusion,
+  and pushes results into a queue for web display or further use.
+"""
+
 import threading
 import time
 import numpy as np

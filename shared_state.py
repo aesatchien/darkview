@@ -1,3 +1,17 @@
+"""
+shared_state.py  - 20250412 CJH
+
+Central configuration and thread construction for the camera fusion system.
+Creates queues, test sources, and CameraWorker and FusionWorker threads.
+
+Globals:
+- cam1, cam2: CameraWorker instances for cam1 and cam2.
+- fusion: FusionWorker instance.
+- cam1_queue, cam2_queue, fusion_queue: Single-frame queues for each stage of the pipeline.
+
+Supports test mode via USE_TEST_MODE to substitute synthetic images for hardware capture.
+"""
+
 import queue
 from camera_thread_queue import CameraWorker, static_test_image, static_test_grid, dynamic_test_image
 from fusion_worker import FusionWorker

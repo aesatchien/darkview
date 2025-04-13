@@ -1,19 +1,28 @@
+"""
+camera_thread_queue.  - 20250412 CJH
+
+Defines the CameraWorker class for threaded image acquisition and processing.
+Each CameraWorker captures grayscale frames, computes saturation masks, and overlays
+contour outlines. Supports test image sources for development without hardware.
+
+Globals:
+- shutdown_requested: Shared Event used to gracefully terminate threads.
+- signal_handler (if used as main): Catches SIGINT and exits cleanly.
+
+Classes:
+- CameraWorker: Threaded camera capture worker.
+Functions:
+- static_test_image, static_test_grid, dynamic_test_image: Synthetic test image generators.
+"""
+
 import cv2
 import threading
 import time
 import numpy as np
 import queue
-import signal
-import sys
 
 shutdown_requested = threading.Event()
 
-def signal_handler(sig, frame):
-    print("\n[CameraWorker] Caught SIGINT, stopping...")
-    shutdown_requested.set()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
 
 class CameraWorker(threading.Thread):
     def __init__(self, name, device, overlay_color, output_queue, test_mode=False, test_image=None,
