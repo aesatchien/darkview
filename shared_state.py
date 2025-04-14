@@ -92,12 +92,13 @@ if USE_UC689:
                     (frame2, cam2_data_queue, cam2_view_queue, "Cam2", (0, 0, 255)),
                 ]):
                     mask = self.compute_mask(img)
-                    outlined = self.draw_mask_outline(img, mask, color)
+                    outlined, contours = self.draw_mask_outline(img, mask, color)
                     frame_data = {
                         'timestamp': time.time(),
                         'image': img,
                         'mask': mask,
-                        'outlined': outlined
+                        'outlined': outlined,
+                        'contours': contours
                     }
                     for q in [q_data, q_view]:
                         if q.full():
