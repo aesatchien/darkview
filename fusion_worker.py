@@ -17,6 +17,12 @@ Queue Flow:
     - 'fused': fused grayscale image
     - 'fused_with_outline': overlay with contours from both masks
 
+Note on Contour Alignment:
+- overlap_trim_x trims both cameras symmetrically in X; contours from both cams are shifted accordingly.
+- overlap_trim_y is used to correct vertical misalignment between physical camera mounts.
+    - Only Cam2 is adjusted vertically to align with Cam1.
+    - As a result, only Cam2's contours are shifted in Y when drawing on the fused image.
+
 FusionWorker does not access the view queues and is not used for preview display.
 """
 
@@ -89,6 +95,13 @@ class FusionWorker(threading.Thread):
         padded[:, x:x + w] = cropped_img
         return padded
 
+    def shift_contours(self, contours, dx=0, dy=0):
+        shifted = []
+        for cnt in contours:
+            cnt_shifted = cnt + np.array([[[dx, dy]]], dtype=cnt.dtype)
+            shifted.append(cnt_shifted)
+        return shifted
+
     def run(self):
         while self.running:
             try:
@@ -104,12 +117,18 @@ class FusionWorker(threading.Thread):
                 print(f"[FusionWorker] Timestamp skew too large: |{ts1 - ts2:.3f}s| — skipping frame")
                 continue
 
+            # allow for overlap mismatch in both x and y for the two cameras
             img1, img2 = self.crop_and_shift(frame1['image'], frame2['image'])
             mask1, mask2 = self.crop_and_shift(frame1['mask'], frame2['mask'])
+            x = self.overlap_trim_x
+            y = self.overlap_trim_y
+
+            # Cam1: only shift X
+            contours1 = self.shift_contours(frame1['contours'], dx=-x, dy=0)
+            # Cam2: shift X and Y
+            contours2 = self.shift_contours(frame2['contours'], dx=+x, dy=+y)
 
             fused = self.fuse_images(img1, img2, mask1)
-            contours1 = frame1['contours']
-            contours2 = frame2['contours']
             fused_with_outline = self.draw_outlines_on_fused(fused, contours1, contours2)
 
             padded_fused = self.pad_to_full_width(fused)

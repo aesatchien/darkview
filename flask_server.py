@@ -50,15 +50,17 @@ HTML_PAGE = """
   <title>Camera Fusion Viewer</title>
 </head>
 <body>
-  <h2>Live Stream</h2>
-  <form method="get" action="/set_mode">
+  <h2>Darkview Camera Live Stream</h2>
+<form method="get" action="/set_mode" style="display: flex; align-items: center; gap: 10px;">
+  <div>
     <button name="view" value="cam1">Cam1 (Blue Outline)</button>
     <button name="view" value="cam2">Cam2 (Red Outline)</button>
     <button name="view" value="fusion">Fusion</button>
-  </form>
-  <form method="get" action="/tune_cam2_exposure">
-    <button type="submit">Auto Tune Cam2 Exposure</button>
-  </form>
+  </div>
+  <div style="margin-left: 60px;">
+    <button formaction="/tune_cam2_exposure" type="submit">Auto Tune Cam2 Exposure</button>
+  </div>
+</form>
   <img src="/stream" width="1280" height="720">
 </body>
 </html>
