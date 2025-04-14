@@ -113,5 +113,5 @@ def update_fusion(data):
     with data_lock:
         fusion_data.update(data)
 
-# Export update functions for main.py to call
+# Export update functions for main.py to call if you decide to import *
 __all__ = ['app', 'update_cam1', 'update_cam2', 'update_fusion']
