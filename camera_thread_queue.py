@@ -38,11 +38,18 @@ class CameraWorker(threading.Thread):
         self.saturation_threshold = saturation_threshold
         self.running = True
         self.pause_capture = threading.Event()
+        self.frame_counter = 0
 
         if not self.test_mode:
             self.cap = cv2.VideoCapture(self.device)
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            # cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)  # if you're okay working with YUYV or MJPEG raw
+            # Confirm settings took effect
+            width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+            height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            print(f"Camera resolution: {int(width)}x{int(height)}")
 
     def stop(self):
         self.running = False
@@ -52,10 +59,11 @@ class CameraWorker(threading.Thread):
     def compute_mask(self, image):
         return cv2.inRange(image, self.saturation_threshold, 255)
 
-    def draw_mask_outline(self, image, mask):
+    def draw_mask_outline(self, image, mask, color=None):
         outlined = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(outlined, contours, -1, self.overlay_color, 2)
+        overlay_color = self.overlay_color if color is None else color
+        cv2.drawContours(outlined, contours, -1, overlay_color, 2)
         return outlined
 
     def run(self):
@@ -67,6 +75,7 @@ class CameraWorker(threading.Thread):
             if self.test_mode:
                 frame = self.test_image() if callable(self.test_image) else self.test_image.copy()
             else:
+                self.cap.grab()
                 ret, frame = self.cap.read()
                 if not ret:
                     print(f"[{self.name}] Frame grab failed")
@@ -85,18 +94,19 @@ class CameraWorker(threading.Thread):
             }
 
             # Only push if consumer has cleared the slot - limit the camera FPS
-            try:
-                self.output_queue.put(frame_data, timeout=0.01)
-            except queue.Full:
-                time.sleep(0.005)  # Back off briefly if not consumed
+            # try:
+            #     self.output_queue.put(frame_data, timeout=0.01)
+            # except queue.Full:
+            #     time.sleep(0.005)  # Back off briefly if not consumed
+            # self.frame_counter += 1
 
             # this is balls-out, no limit on the cam1 and cam2 queues
-            # if self.output_queue.full():
-            #     try:
-            #         self.output_queue.get_nowait()
-            #     except queue.Empty:
-            #         pass
-            # self.output_queue.put(frame_data)
+            if self.output_queue.full():
+                try:
+                    self.output_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            self.output_queue.put(frame_data)
             time.sleep(0.001)
 
 # Example static test image

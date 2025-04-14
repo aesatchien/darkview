@@ -17,9 +17,9 @@ import queue
 import cv2
 
 class FusionWorker(threading.Thread):
-    def __init__(self, cam1_queue, cam2_queue, fusion_queue, max_time_skew=0.05,
+    def __init__(self, cam1_queue, cam2_queue, fusion_queue, max_time_skew=0.15,
                  cam1_overlay_color=(255, 0, 0), cam2_overlay_color=(0, 0, 255),
-                 overlap_trim_x=80):
+                 overlap_trim_x=5, overlap_trim_y=5, ):
         super().__init__(name="FusionWorker")
         self.cam1_queue = cam1_queue
         self.cam2_queue = cam2_queue
@@ -28,15 +28,35 @@ class FusionWorker(threading.Thread):
         self.cam1_overlay_color = cam1_overlay_color
         self.cam2_overlay_color = cam2_overlay_color
         self.overlap_trim_x = overlap_trim_x
+        self.overlap_trim_y = overlap_trim_y
         self.running = True
+        self.frame_counter = 0
 
     def stop(self):
         self.running = False
 
     def crop_and_shift(self, img1, img2):
         x = self.overlap_trim_x
-        img1_cropped = img1[:, x:]      # trim left edge of cam1
-        img2_cropped = img2[:, :-x]     # trim right edge of cam2
+        y = self.overlap_trim_y
+
+        # Crop X as before
+        img1_x = img1[:, x:]
+        img2_x = img2[:, :-x or None]
+
+        # Crop Y based on sign
+        if y > 0:
+            # cam1 is lower → trim top of cam1, bottom of cam2
+            img1_cropped = img1_x[y:, :]
+            img2_cropped = img2_x[:-y or None, :]
+        elif y < 0:
+            y = abs(y)
+            # cam2 is lower → trim bottom of cam1, top of cam2
+            img1_cropped = img1_x[:-y or None, :]
+            img2_cropped = img2_x[y:, :]
+        else:
+            img1_cropped = img1_x
+            img2_cropped = img2_x
+
         return img1_cropped, img2_cropped
 
     def fuse_images(self, img1, img2, mask1):
@@ -99,5 +119,6 @@ class FusionWorker(threading.Thread):
                 except queue.Empty:
                     pass
             self.fusion_queue.put(fused_data)
+            self.frame_counter += 1
 
             time.sleep(0.001)

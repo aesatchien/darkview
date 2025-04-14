@@ -40,6 +40,7 @@ if USE_UC689:
                     time.sleep(0.01)
                     continue
 
+                self.cap.grab()
                 ret, frame = self.cap.read()
                 if not ret:
                     print(f"[{self.name}] Frame grab failed")
@@ -54,17 +55,24 @@ if USE_UC689:
                     (frame2, cam2_queue, "Cam2", (0, 0, 255)),
                 ]):
                     mask = self.compute_mask(img)
-                    outlined = self.draw_mask_outline(img, mask)
+                    outlined = self.draw_mask_outline(img, mask, color)
                     frame_data = {
                         'timestamp': time.time(),
                         'image': img,
                         'mask': mask,
                         'outlined': outlined
                     }
-                    try:
-                        q.put(frame_data, timeout=0.01)
-                    except queue.Full:
-                        time.sleep(0.005)
+                    # try:
+                    #     q.put(frame_data, timeout=0.01)
+                    # except queue.Full:
+                    #     time.sleep(0.005)
+                    if q.full():
+                        try:
+                            q.get_nowait()
+                        except queue.Empty:
+                            pass
+                    q.put(frame_data)
+                    self.frame_counter += 1
 
                 time.sleep(0.001)
 
@@ -109,5 +117,6 @@ fusion = FusionWorker(
     fusion_queue=fusion_queue,
     cam1_overlay_color=(255, 0, 0),  # Blue
     cam2_overlay_color=(0, 0, 255),  # Red
-    overlap_trim_x=80
+    overlap_trim_x=5,
+    overlap_trim_y=-18
 )

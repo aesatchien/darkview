@@ -96,7 +96,7 @@ def stream():
                 if ret:
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-            time.sleep(0.03)  # ~30 FPS cap
+            time.sleep(0.01)  # ~30 FPS cap
 
     return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
