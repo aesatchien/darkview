@@ -1,14 +1,25 @@
 """
 fusion_worker.py  - 20250412 CJH
 
-Defines the FusionWorker class, which fuses synchronized frames from cam1 and cam2.
-It trims overlap, applies mask-based pixel replacement, draws outlines from both masks,
-and pads the result to full resolution.
+Defines the FusionWorker thread, which performs synchronized image fusion
+using grayscale inputs from two cameras.
 
-Class:
-- FusionWorker: Thread that waits for time-synced cam1/cam2 frames, performs fusion,
-  and pushes results into a queue for web display or further use.
+Responsibilities:
+- Waits for timestamp-synced frames from cam1 and cam2 (via data queues)
+- Trims overlapping edges in X and Y
+- Applies mask-based pixel substitution from cam2 into cam1
+- Draws contours from both masks in colored overlay
+- Pads the final fused output to full width
+
+Queue Flow:
+- Input: cam1_data_queue, cam2_data_queue (must be timestamp-aligned)
+- Output: fusion_queue, which contains dicts with:
+    - 'fused': fused grayscale image
+    - 'fused_with_outline': overlay with contours from both masks
+
+FusionWorker does not access the view queues and is not used for preview display.
 """
+
 
 import threading
 import time
@@ -16,10 +27,11 @@ import numpy as np
 import queue
 import cv2
 
+
 class FusionWorker(threading.Thread):
     def __init__(self, cam1_queue, cam2_queue, fusion_queue, max_time_skew=0.15,
                  cam1_overlay_color=(255, 0, 0), cam2_overlay_color=(0, 0, 255),
-                 overlap_trim_x=5, overlap_trim_y=5, ):
+                 overlap_trim_x=5, overlap_trim_y=5):
         super().__init__(name="FusionWorker")
         self.cam1_queue = cam1_queue
         self.cam2_queue = cam2_queue
@@ -39,18 +51,14 @@ class FusionWorker(threading.Thread):
         x = self.overlap_trim_x
         y = self.overlap_trim_y
 
-        # Crop X as before
         img1_x = img1[:, x:]
         img2_x = img2[:, :-x or None]
 
-        # Crop Y based on sign
         if y > 0:
-            # cam1 is lower → trim top of cam1, bottom of cam2
             img1_cropped = img1_x[y:, :]
             img2_cropped = img2_x[:-y or None, :]
         elif y < 0:
             y = abs(y)
-            # cam2 is lower → trim bottom of cam1, top of cam2
             img1_cropped = img1_x[:-y or None, :]
             img2_cropped = img2_x[y:, :]
         else:
@@ -64,10 +72,8 @@ class FusionWorker(threading.Thread):
         fused[mask1 > 0] = img2[mask1 > 0]
         return fused
 
-    def draw_outlines_on_fused(self, fused, mask1, mask2):
+    def draw_outlines_on_fused(self, fused, contours1, contours2):
         fused_color = cv2.cvtColor(fused, cv2.COLOR_GRAY2BGR)
-        contours1, _ = cv2.findContours(mask1, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours2, _ = cv2.findContours(mask2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(fused_color, contours1, -1, self.cam1_overlay_color, 1)
         cv2.drawContours(fused_color, contours2, -1, self.cam2_overlay_color, 1)
         return fused_color
@@ -75,7 +81,7 @@ class FusionWorker(threading.Thread):
     def pad_to_full_width(self, cropped_img):
         h, w = cropped_img.shape[:2]
         x = self.overlap_trim_x
-        full_w = w + 2 * x  # pad both sides
+        full_w = w + 2 * x
         if len(cropped_img.shape) == 2:
             padded = np.full((h, full_w), 128, dtype=np.uint8)
         else:
@@ -102,7 +108,9 @@ class FusionWorker(threading.Thread):
             mask1, mask2 = self.crop_and_shift(frame1['mask'], frame2['mask'])
 
             fused = self.fuse_images(img1, img2, mask1)
-            fused_with_outline = self.draw_outlines_on_fused(fused, mask1, mask2)
+            contours1 = frame1['contours']
+            contours2 = frame2['contours']
+            fused_with_outline = self.draw_outlines_on_fused(fused, contours1, contours2)
 
             padded_fused = self.pad_to_full_width(fused)
             padded_fused_with_outline = self.pad_to_full_width(fused_with_outline)

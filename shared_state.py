@@ -1,3 +1,38 @@
+"""
+shared_state.py  - 20250414 CJH
+
+Defines all global configuration, queue declarations, and thread construction
+for the dual-camera fusion vision system.
+
+Responsibilities:
+- Configures resolution, saturation threshold, and input sources
+- Creates all necessary queues for data and preview flow
+- Constructs camera threads (CameraWorker or SplitUC689Worker) and FusionWorker
+
+Queue Architecture:
+- cam1_data_queue, cam2_data_queue:
+    → These carry frames for downstream processing (e.g., FusionWorker).
+- cam1_view_queue, cam2_view_queue:
+    → These carry frames for live preview display via Flask.
+- fusion_queue:
+    → Carries fused output frames for web streaming.
+
+Worker Threads:
+- cam1 and cam2 are instances of CameraWorker, unless using the UC-689 stereo camera.
+- If USE_UC689 is True, a single SplitUC689Worker is used to split the frame
+  into left (Cam1) and right (Cam2) views from a single physical device.
+  It generates independent frame_data dicts and feeds them to the appropriate
+  data and view queues for Cam1 and Cam2 respectively.
+
+Fusion Thread:
+- FusionWorker reads from the cam1_data_queue and cam2_data_queue only,
+  synchronizes frames, performs fusion, and pushes to fusion_queue.
+
+Test Mode:
+- When USE_TEST_MODE is True, static and dynamic synthetic images are used
+  for development and testing with no physical camera required.
+"""
+
 import queue
 import cv2
 import numpy as np
@@ -9,8 +44,8 @@ from fusion_worker import FusionWorker
 # Configuration
 RESOLUTION = (1280, 720)
 SATURATION_THRESHOLD = 250
-USE_TEST_MODE = False
-USE_UC689 = True  # True means use UC-689 split mode - it's a stereo bar with two cams treated as one
+USE_TEST_MODE = True
+USE_UC689 = False  # True means use UC-689 split mode - it's a stereo bar with two cams treated as one
 
 if USE_TEST_MODE:
     cam1_source = static_test_grid
@@ -23,8 +58,10 @@ else:
     cam2_source = "/dev/video1"
 
 # Queues
-cam1_queue = queue.Queue(maxsize=1)
-cam2_queue = queue.Queue(maxsize=1)
+cam1_data_queue = queue.Queue(maxsize=1)
+cam1_view_queue = queue.Queue(maxsize=1)
+cam2_data_queue = queue.Queue(maxsize=1)
+cam2_view_queue = queue.Queue(maxsize=1)
 fusion_queue = queue.Queue(maxsize=1)
 
 def split_uc689_frame(frame):
@@ -50,9 +87,9 @@ if USE_UC689:
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 frame1, frame2 = split_uc689_frame(frame)
 
-                for idx, (img, q, name, color) in enumerate([
-                    (frame1, cam1_queue, "Cam1", (255, 0, 0)),
-                    (frame2, cam2_queue, "Cam2", (0, 0, 255)),
+                for idx, (img, q_data, q_view, name, color) in enumerate([
+                    (frame1, cam1_data_queue, cam1_view_queue, "Cam1", (255, 0, 0)),
+                    (frame2, cam2_data_queue, cam2_view_queue, "Cam2", (0, 0, 255)),
                 ]):
                     mask = self.compute_mask(img)
                     outlined = self.draw_mask_outline(img, mask, color)
@@ -62,16 +99,13 @@ if USE_UC689:
                         'mask': mask,
                         'outlined': outlined
                     }
-                    # try:
-                    #     q.put(frame_data, timeout=0.01)
-                    # except queue.Full:
-                    #     time.sleep(0.005)
-                    if q.full():
-                        try:
-                            q.get_nowait()
-                        except queue.Empty:
-                            pass
-                    q.put(frame_data)
+                    for q in [q_data, q_view]:
+                        if q.full():
+                            try:
+                                q.get_nowait()
+                            except queue.Empty:
+                                pass
+                        q.put(frame_data)
                     self.frame_counter += 1
 
                 time.sleep(0.001)
@@ -81,7 +115,6 @@ if USE_UC689:
         device=cam1_source,
         overlay_color=(255, 255, 0),
         output_queue=None,
-        test_mode=False,
         test_image=None,
         resolution=(2560, 720),
         saturation_threshold=SATURATION_THRESHOLD
@@ -92,7 +125,7 @@ else:
         name="Cam1",
         device=cam1_source,
         overlay_color=(255, 0, 0),  # Blue
-        output_queue=cam1_queue,
+        output_queue=(cam1_data_queue, cam1_view_queue),
         test_mode=USE_TEST_MODE,
         test_image=cam1_source,
         resolution=RESOLUTION,
@@ -103,7 +136,7 @@ else:
         name="Cam2",
         device=cam2_source,
         overlay_color=(0, 0, 255),  # Red
-        output_queue=cam2_queue,
+        output_queue=(cam2_data_queue, cam2_view_queue),
         test_mode=USE_TEST_MODE,
         test_image=cam2_source,
         resolution=RESOLUTION,
@@ -112,8 +145,8 @@ else:
 
 # Fusion thread
 fusion = FusionWorker(
-    cam1_queue=cam1_queue,
-    cam2_queue=cam2_queue,
+    cam1_queue=cam1_data_queue,
+    cam2_queue=cam2_data_queue,
     fusion_queue=fusion_queue,
     cam1_overlay_color=(255, 0, 0),  # Blue
     cam2_overlay_color=(0, 0, 255),  # Red

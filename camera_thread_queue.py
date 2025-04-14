@@ -31,7 +31,12 @@ class CameraWorker(threading.Thread):
         self.name = name
         self.device = device
         self.overlay_color = overlay_color
-        self.output_queue = output_queue
+
+        if isinstance(output_queue, tuple):
+            self.data_queue, self.view_queue = output_queue
+        else:
+            self.data_queue = self.view_queue = output_queue
+
         self.test_mode = test_mode
         self.test_image = test_image
         self.resolution = resolution
@@ -45,8 +50,6 @@ class CameraWorker(threading.Thread):
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            # cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)  # if you're okay working with YUYV or MJPEG raw
-            # Confirm settings took effect
             width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
             height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
             print(f"Camera resolution: {int(width)}x{int(height)}")
@@ -59,12 +62,13 @@ class CameraWorker(threading.Thread):
     def compute_mask(self, image):
         return cv2.inRange(image, self.saturation_threshold, 255)
 
+    # return the contours here so fusion doesn't have to do it
     def draw_mask_outline(self, image, mask, color=None):
         outlined = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         overlay_color = self.overlay_color if color is None else color
         cv2.drawContours(outlined, contours, -1, overlay_color, 2)
-        return outlined
+        return outlined, contours
 
     def run(self):
         while self.running and not shutdown_requested.is_set():
@@ -84,32 +88,28 @@ class CameraWorker(threading.Thread):
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
             mask = self.compute_mask(frame)
-            outlined = self.draw_mask_outline(frame, mask)
+            outlined, contours = self.draw_mask_outline(frame, mask)
 
             frame_data = {
                 'timestamp': time.time(),
                 'image': frame,
                 'mask': mask,
-                'outlined': outlined
+                'outlined': outlined,
+                'contours': contours
             }
 
-            # Only push if consumer has cleared the slot - limit the camera FPS
-            # try:
-            #     self.output_queue.put(frame_data, timeout=0.01)
-            # except queue.Full:
-            #     time.sleep(0.005)  # Back off briefly if not consumed
-            # self.frame_counter += 1
+            for q in [self.data_queue, self.view_queue]:
+                if q.full():
+                    try:
+                        q.get_nowait()
+                    except queue.Empty:
+                        pass
+                q.put(frame_data)
 
-            # this is balls-out, no limit on the cam1 and cam2 queues
-            if self.output_queue.full():
-                try:
-                    self.output_queue.get_nowait()
-                except queue.Empty:
-                    pass
-            self.output_queue.put(frame_data)
+            self.frame_counter += 1
             time.sleep(0.001)
 
-# Example static test image
+
 def static_test_image():
     img = np.zeros((720, 1280), dtype=np.uint8)
     cv2.rectangle(img, (300, 300), (1000, 500), 255, -1)
@@ -132,14 +132,11 @@ def static_test_grid():
                 x0 = c * tile_size + gap // 2
                 y1 = y0 + white_size
                 x1 = x0 + white_size
-                # Clamp to image size to prevent overrun
                 y1 = min(y1, height)
                 x1 = min(x1, width)
                 img[y0:y1, x0:x1] = 255
     return img
 
-
-# Example dynamic test image
 def dynamic_test_image():
     t = int(time.time() * 90) % 1280
     img = np.zeros((720, 1280), dtype=np.uint8)

@@ -1,9 +1,35 @@
+"""
+main.py  - 20250414 CJH
+
+Launches all threads and coordinates shutdown for the dual-camera fusion system.
+
+Responsibilities:
+- Starts the Cam1, Cam2, and FusionWorker threads
+- Starts the Flask feeder thread to update the web preview
+- Registers a SIGINT handler for graceful shutdown of all threads
+
+Queue Architecture:
+- cam1_data_queue, cam2_data_queue:
+    → Used by FusionWorker to receive synchronized frames for downstream processing.
+- cam1_view_queue, cam2_view_queue:
+    → Used by the Flask feeder thread to update the web UI with the latest camera previews.
+- fusion_queue:
+    → Receives fused output from FusionWorker, used by the Flask feeder thread.
+
+Shared State:
+- update_cam1(), update_cam2(), and update_fusion() update the shared dictionaries
+  read by Flask's /stream route for live MJPEG viewing.
+
+Entry Point:
+- If run as main, launches all threads and serves Flask on port 5000.
+"""
+
 import threading
 import time
 import signal
 import sys
 import queue
-from shared_state import cam1, cam2, fusion, cam1_queue, cam2_queue, fusion_queue
+from shared_state import cam1, cam2, fusion, cam1_view_queue , cam2_view_queue , fusion_queue
 from camera_thread_queue import shutdown_requested
 from flask_server import app, update_cam1, update_cam2, update_fusion, current_mode
 
@@ -15,13 +41,13 @@ def flask_feeder():
             view = current_mode['view']
             if view == 'cam1':
                 try:
-                    frame = cam1_queue.get(timeout=1.0)
+                    frame = cam1_view_queue.get(timeout=1.0)
                     update_cam1(frame)
                 except queue.Empty:
                     pass
             elif view == 'cam2':
                 try:
-                    frame = cam2_queue.get(timeout=1.0)
+                    frame = cam2_view_queue.get(timeout=1.0)
                     update_cam2(frame)
                 except queue.Empty:
                     pass
@@ -66,22 +92,6 @@ def monitor_fps():
     last_count_f = 0
 
     while True:
-        # if not cam1_queue.empty():
-        #     ts = cam1_queue.queue[0]['timestamp']
-        #     if ts != last_ts_c1:
-        #         count_c1 += 1
-        #         last_ts_c1 = ts
-        # if not cam2_queue.empty():
-        #     ts = cam2_queue.queue[0]['timestamp']
-        #     if ts != last_ts_c2:
-        #         count_c2 += 1
-        #         last_ts_c2 = ts
-        # if not fusion_queue.empty():
-        #     ts = fusion_queue.queue[0]['timestamp']
-        #     if ts != last_ts_f:
-        #         count_f += 1
-        #         last_ts_f = ts
-
         now = time.time()
         if now - prev_time >= 1.0:
             count_c1 = cam1.frame_counter - last_count_c1

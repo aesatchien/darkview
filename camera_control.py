@@ -1,14 +1,22 @@
 """
 camera_control.py  - 20250412 CJH
 
-Provides utility functions for controlling camera hardware via v4l2 (the default linux camera control),
-including setting exposure parameters and auto-tuning based on saturation percentage.
+Provides utility functions for controlling camera hardware using v4l2-ctl
+and for automatically tuning exposure based on image saturation levels.
 
 Functions:
-- set_camera_param: Sends a v4l2-ctl command to update a specific camera control.
-- auto_exposure_tune: Iteratively finds the best exposure to avoid over-saturation
-  using the provided camera frame queue - e.g. point the camera at the sun and run it.
+- set_camera_param(device, param, value):
+    Sends a v4l2-ctl command to set a camera control parameter.
+
+- auto_exposure_tune(cam_device, cam_queue, target_pct=1.5, exposure_list=None):
+    Iteratively selects the lowest exposure from the list that keeps saturation
+    below the given target percentage, using frames from the provided queue.
+
+    The queue should provide dicts with a 'mask' array indicating saturated pixels.
+    In a dual-queue architecture, this should be the *view queue* (not the data queue),
+    to avoid interfering with downstream processing.
 """
+
 
 import subprocess
 import numpy as np
