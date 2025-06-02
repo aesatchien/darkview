@@ -44,8 +44,8 @@ from fusion_worker import FusionWorker
 # Configuration
 RESOLUTION = (1280, 720)
 SATURATION_THRESHOLD = 250
-USE_TEST_MODE = True
-USE_UC689 = False  # True means use UC-689 split mode - it's a stereo bar with two cams treated as one
+USE_TEST_MODE = False
+USE_UC689 = True  # True means use UC-689 split mode - it's a stereo bar with two cams treated as one
 
 if USE_TEST_MODE:
     cam1_source = static_test_grid
@@ -81,7 +81,7 @@ if USE_UC689:
                 ret, frame = self.cap.read()
                 if not ret:
                     print(f"[{self.name}] Frame grab failed")
-                    time.sleep(0.05)
+                    time.sleep(0.03)
                     continue
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)

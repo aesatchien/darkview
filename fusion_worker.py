@@ -47,6 +47,7 @@ class FusionWorker(threading.Thread):
         self.cam2_overlay_color = cam2_overlay_color
         self.overlap_trim_x = overlap_trim_x
         self.overlap_trim_y = overlap_trim_y
+        self.use_clahe = True
         self.running = True
         self.frame_counter = 0
 
@@ -128,6 +129,10 @@ class FusionWorker(threading.Thread):
             # Cam2: shift X and Y
             contours2 = self.shift_contours(frame2['contours'], dx=+x, dy=+y)
 
+            # Optional CLAHE enhancement on the filtered image to undarken
+            if self.use_clahe:
+                img2 = apply_clahe_masked_region(img2, mask1)
+
             fused = self.fuse_images(img1, img2, mask1)
             fused_with_outline = self.draw_outlines_on_fused(fused, contours1, contours2)
 
@@ -149,3 +154,45 @@ class FusionWorker(threading.Thread):
             self.frame_counter += 1
 
             time.sleep(0.001)
+
+
+def apply_clahe_masked_region(image, mask, clip_limit=2.0, tile_grid_size=(8, 8)):
+    """
+    Efficient CLAHE contrast enhancement only on masked region (grayscale or BGR).
+    Applies CLAHE only to the bounding box surrounding nonzero mask pixels.
+    Returns a copy of the image with enhanced region.
+    """
+    ys, xs = np.where(mask > 0)
+    if len(xs) == 0 or len(ys) == 0:
+        return image  # nothing to do
+
+    x_min, x_max = xs.min(), xs.max()
+    y_min, y_max = ys.min(), ys.max()
+
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+
+    roi_img = image[y_min:y_max+1, x_min:x_max+1]
+    roi_mask = mask[y_min:y_max+1, x_min:x_max+1]
+
+    if len(roi_img.shape) == 2 or roi_img.shape[2] == 1:  # Grayscale
+        l = roi_img.copy()
+        l_clahe = l.copy()
+        l_clahe[roi_mask > 0] = clahe.apply(l)[roi_mask > 0]
+        output = image.copy()
+        output[y_min:y_max+1, x_min:x_max+1] = l_clahe
+        return output
+
+    elif len(roi_img.shape) == 3 and roi_img.shape[2] == 3:  # BGR
+        lab = cv2.cvtColor(roi_img, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        l_clahe = l.copy()
+        l_full = clahe.apply(l)
+        l_clahe[roi_mask > 0] = l_full[roi_mask > 0]
+        merged = cv2.merge((l_clahe, a, b))
+        roi_bgr = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
+        output = image.copy()
+        output[y_min:y_max+1, x_min:x_max+1] = roi_bgr
+        return output
+
+    else:
+        raise ValueError("Unsupported image format for CLAHE")

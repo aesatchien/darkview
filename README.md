@@ -5,6 +5,8 @@ This project implements a high-performance, multi-threaded image acquisition and
 
 Designed originally for use in robotics and real-time inspection, this version (V5) includes clean thread isolation, shared-state coordination, and test-mode support using synthetic images.
 
+Some of the docs for the dual arducam are [general pi camera stuff](https://docs.arducam.com/Raspberry-Pi-Camera/Pivariety-Camera/Quick-Start-Guide/) and [exposure time](https://docs.arducam.com/UVC-Camera/Adjust-the-minimum-exposure-time/).
+
 ---
 
 ## Overview

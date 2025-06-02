@@ -37,6 +37,7 @@ def set_camera_param(device, param, value):
 
 def auto_exposure_tune(cam_device, cam_queue, target_pct=1.5, exposure_list=None):
     if exposure_list is None:
+        # seems on the dual arducam I can use 1 through 100, so about two orders of magnitude of dynamic range
         exposure_list = [16000, 8000, 4000, 2000, 1000, 500]
 
     print(f"\n[AutoExposure] Starting sweep on {cam_device}")
