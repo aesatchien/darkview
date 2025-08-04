@@ -45,14 +45,19 @@ class CameraWorker(threading.Thread):
         self.pause_capture = threading.Event()
         self.frame_counter = 0
 
+        do_by_v42cl = True  # set the cameras externally - seems like i need to for the MSLifecams
         if not self.test_mode:
             self.cap = cv2.VideoCapture(self.device)
+            self.cap.set(cv2.CAP_PROP_FOURCC, 1196444237)  # 'MJPG'
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            self.cap.set(cv2.CAP_PROP_FPS, 30)
+
             width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
             height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-            print(f"Camera resolution: {int(width)}x{int(height)}")
+            fps = self.cap.get(cv2.CAP_PROP_FPS)
+            print(f" Device: {self.device} Camera resolution: {int(width)}x{int(height)}  fps: {fps}")
 
     def stop(self):
         self.running = False

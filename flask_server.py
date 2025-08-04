@@ -81,7 +81,7 @@ def set_mode():
 @app.route('/tune_cam2_exposure')
 def tune_cam2_exposure():
     cam2.pause_capture.set()
-    auto_exposure_tune("/dev/video1", cam2_view_queue)
+    auto_exposure_tune(cam2.device, cam2_view_queue)
     cam2.pause_capture.clear()
     return render_template_string(HTML_PAGE)
 

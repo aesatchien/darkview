@@ -36,15 +36,17 @@ def set_camera_param(device, param, value):
 
 
 def auto_exposure_tune(cam_device, cam_queue, target_pct=1.5, exposure_list=None):
+    exposure_param = 'exposure_time_absolute'  # "exposure_absolute"
     if exposure_list is None:
         # seems on the dual arducam I can use 1 through 100, so about two orders of magnitude of dynamic range
         exposure_list = [16000, 8000, 4000, 2000, 1000, 500]
+        exposure_list = [200, 100, 50, 30, 20, 10, 5, 2]  # logitechs
 
     print(f"\n[AutoExposure] Starting sweep on {cam_device}")
     best_exposure = None
-
     for exposure in exposure_list:
-        set_camera_param(cam_device, "exposure_absolute", exposure)
+
+        set_camera_param(cam_device, exposure_param, exposure)
         time.sleep(0.1)  # let setting take effect
 
         try:
@@ -63,6 +65,6 @@ def auto_exposure_tune(cam_device, cam_queue, target_pct=1.5, exposure_list=None
 
     if best_exposure:
         print(f"[AutoExposure] Selected exposure: {best_exposure} \n")
-        set_camera_param(cam_device, "exposure_absolute", best_exposure)
+        set_camera_param(cam_device, exposure_param, best_exposure)
     else:
         print("[AutoExposure] No exposure found below target saturation threshold")

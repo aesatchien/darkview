@@ -35,9 +35,9 @@ import cv2
 
 
 class FusionWorker(threading.Thread):
-    def __init__(self, cam1_queue, cam2_queue, fusion_queue, max_time_skew=0.15,
+    def __init__(self, cam1_queue, cam2_queue, fusion_queue, max_time_skew=0.25,
                  cam1_overlay_color=(255, 0, 0), cam2_overlay_color=(0, 0, 255),
-                 overlap_trim_x=5, overlap_trim_y=5):
+                 overlap_trim_x=0, overlap_trim_y=-10):
         super().__init__(name="FusionWorker")
         self.cam1_queue = cam1_queue
         self.cam2_queue = cam2_queue

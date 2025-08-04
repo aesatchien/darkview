@@ -42,10 +42,11 @@ from camera_thread_queue import CameraWorker, static_test_image, static_test_gri
 from fusion_worker import FusionWorker
 
 # Configuration
-RESOLUTION = (1280, 720)
+# RESOLUTION = (1280, 720)
+RESOLUTION = (640, 480)  # MS lifecams
 SATURATION_THRESHOLD = 250
-USE_TEST_MODE = False
-USE_UC689 = True  # True means use UC-689 split mode - it's a stereo bar with two cams treated as one
+USE_TEST_MODE = False  # Use a fake image to test the functionality
+USE_UC689 = False  # True means use UC-689 split mode - it's a stereo bar with two cams treated as one
 
 if USE_TEST_MODE:
     cam1_source = static_test_grid
@@ -53,9 +54,10 @@ if USE_TEST_MODE:
 elif USE_UC689:
     cam1_source = "/dev/video0"
     cam2_source = None
-else:
+else:  # need to make this smarter to query and use the two good cameras
     cam1_source = "/dev/video0"
-    cam2_source = "/dev/video1"
+    cam2_source = "/dev/video2"
+print(f'cam sources are {cam1_source} and {cam2_source}')
 
 # Queues
 cam1_data_queue = queue.Queue(maxsize=1)
@@ -151,6 +153,8 @@ fusion = FusionWorker(
     fusion_queue=fusion_queue,
     cam1_overlay_color=(255, 0, 0),  # Blue
     cam2_overlay_color=(0, 0, 255),  # Red
-    overlap_trim_x=5,
-    overlap_trim_y=-18
+    # 5, -18 seems to work for the arducam stereo bar (why should y be nonzero?)
+    # 0, -5 seems to work on the stacked logitechs with cam2 on bottom
+    overlap_trim_x=0,  # 5 is good x for the arducam stereo bar
+    overlap_trim_y=-5,  # -18 is good y for the arducam stereo bar
 )
