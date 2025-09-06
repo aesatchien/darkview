@@ -44,7 +44,7 @@ from fusion_worker import FusionWorker
 # Configuration
 # RESOLUTION = (1280, 720)
 RESOLUTION = (640, 480)  # MS lifecams
-SATURATION_THRESHOLD = 250
+SATURATION_THRESHOLD = 240
 USE_TEST_MODE = False  # Use a fake image to test the functionality
 USE_UC689 = False  # True means use UC-689 split mode - it's a stereo bar with two cams treated as one
 
@@ -155,6 +155,7 @@ fusion = FusionWorker(
     cam2_overlay_color=(0, 0, 255),  # Red
     # 5, -18 seems to work for the arducam stereo bar (why should y be nonzero?)
     # 0, -5 seems to work on the stacked logitechs with cam2 on bottom
-    overlap_trim_x=0,  # 5 is good x for the arducam stereo bar
-    overlap_trim_y=-5,  # -18 is good y for the arducam stereo bar
+    # 10,-40 seems to work on the stacked arducams
+    overlap_trim_x=10,  # 5 is good x for the arducam stereo bar
+    overlap_trim_y=-40,  # -18 is good y for the arducam stereo bar
 )
