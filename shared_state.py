@@ -154,8 +154,8 @@ fusion = FusionWorker(
     cam1_overlay_color=(255, 0, 0),  # Blue
     cam2_overlay_color=(0, 0, 255),  # Red
     # 5, -18 seems to work for the arducam stereo bar (why should y be nonzero?)
-    # 0, -5 seems to work on the stacked logitechs with cam2 on bottom
+    # 0, 10 seems to work on the stacked logitechs with cam2 on bottom
     # 10,-40 seems to work on the stacked arducams
-    overlap_trim_x=10,  # 5 is good x for the arducam stereo bar
-    overlap_trim_y=-40,  # -18 is good y for the arducam stereo bar
+    overlap_trim_x=0,  # 5 is good x for the arducam stereo bar
+    overlap_trim_y=10,  # -18 is good y for the arducam stereo bar
 )

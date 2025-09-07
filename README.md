@@ -23,7 +23,7 @@ Some of the docs for the dual arducam are [general pi camera stuff](https://docs
 
 ### camera_control.py
 - Provides utility functions for setting v4l2 camera parameters
-- Includes `auto_exposure_tune()` to scan and apply the best exposure based on mask saturation threshold
+- Includes `auto_exposure_tune()` [experimental!] to scan and apply the best exposure based on mask saturation threshold
 
 ### camera_thread_queue.py
 - Defines the `CameraWorker` thread class
@@ -80,15 +80,15 @@ Some of the docs for the dual arducam are [general pi camera stuff](https://docs
 Then open your browser to `http://<raspberry-pi-ip>:5000`
 
 ### Run in Test Mode
-By default, `shared_state.py` uses `USE_TEST_MODE = True`. This uses synthetic images and allows rapid development with no hardware.
+To try w/p a camera, `shared_state.py` can set `USE_TEST_MODE = True`. This uses synthetic images and allows rapid development with no hardware.
 
 ---
 
-## Controls
+## Web Interface Controls (flask)
 
 - **Switch Views**: Click `Cam1`, `Cam2`, or `Fusion` to switch output stream
 - **Tune Exposure**: Click `Auto Tune Cam2 Exposure` to dynamically adjust cam2 exposure
-
+- **Record Movie**: Click `Record` and a 10s video will be saved to the clips folder with a timestamp
 ---
 
 ## Notes

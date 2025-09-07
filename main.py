@@ -111,7 +111,7 @@ def monitor_fps():
 
 signal.signal(signal.SIGINT, shutdown_handler)
 
-# Start threads
+# Start threads - basically the entire program is these five threads - three cams, an FPS monitor, and feed Flask
 if cam1:
     cam1.start()
 if cam2:
