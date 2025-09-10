@@ -19,9 +19,10 @@ Queue Flow:
 
 Note on Contour Alignment:
 - overlap_trim_x trims both cameras symmetrically in X; contours from both cams are shifted accordingly.
-- overlap_trim_y is used to correct vertical misalignment between physical camera mounts.
+- overlap_trim_y is used to correct vertical misalignment between physical camera mounts (and sensor mount misalignment)
     - Only Cam2 is adjusted vertically to align with Cam1.
     - As a result, only Cam2's contours are shifted in Y when drawing on the fused image.
+you can get the exact overlaps with a cv2.phaseCorrelate - at some point I should build this in
 
 FusionWorker does not access the view queues and is not used for preview display.
 """
@@ -82,6 +83,8 @@ class FusionWorker(threading.Thread):
     def draw_outlines_on_fused(self, fused, contours1, contours2):
         fused_color = cv2.cvtColor(fused, cv2.COLOR_GRAY2BGR)
         cv2.drawContours(fused_color, contours1, -1, self.cam1_overlay_color, 1)
+        # the contours need to be offset on cam2 since we are bringing it into registration with cam1
+
         cv2.drawContours(fused_color, contours2, -1, self.cam2_overlay_color, 1)
         return fused_color
 
@@ -126,11 +129,12 @@ class FusionWorker(threading.Thread):
 
             # Cam1: only shift X
             contours1 = self.shift_contours(frame1['contours'], dx=-x, dy=0)
-            # Cam2: shift X and Y
-            contours2 = self.shift_contours(frame2['contours'], dx=+x, dy=+y)
+            # Cam2: only shift Y?  When I first wrote this I have cams stacked horizontally, then vertically
+            contours2 = self.shift_contours(frame2['contours'], dx=0, dy=+y)
 
             # Optional CLAHE enhancement on the filtered image to undarken
             if self.use_clahe:
+                img1 = apply_clahe_masked_region(img1, np.ones_like(img1) - mask1, clip_limit=1)
                 img2 = apply_clahe_masked_region(img2, mask1)
 
             fused = self.fuse_images(img1, img2, mask1)
@@ -156,11 +160,12 @@ class FusionWorker(threading.Thread):
             time.sleep(0.001)
 
 
-def apply_clahe_masked_region(image, mask, clip_limit=2.0, tile_grid_size=(8, 8)):
+def apply_clahe_masked_region(image, mask, clip_limit=4.0, tile_grid_size=(8, 8)):
     """
     Efficient CLAHE contrast enhancement only on masked region (grayscale or BGR).
     Applies CLAHE only to the bounding box surrounding nonzero mask pixels.
     Returns a copy of the image with enhanced region.
+    4 is about as high as you want to go with clip limit before it starts enhancing noise
     """
     ys, xs = np.where(mask > 0)
     if len(xs) == 0 or len(ys) == 0:
@@ -175,7 +180,7 @@ def apply_clahe_masked_region(image, mask, clip_limit=2.0, tile_grid_size=(8, 8)
     roi_mask = mask[y_min:y_max+1, x_min:x_max+1]
 
     if len(roi_img.shape) == 2 or roi_img.shape[2] == 1:  # Grayscale
-        l = roi_img.copy()
+        l = roi_img  #  no need to copy this .copy()
         l_clahe = l.copy()
         l_clahe[roi_mask > 0] = clahe.apply(l)[roi_mask > 0]
         output = image.copy()
