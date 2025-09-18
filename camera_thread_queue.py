@@ -52,7 +52,7 @@ class CameraWorker(threading.Thread):
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            self.cap.set(cv2.CAP_PROP_FPS, 30)
+            self.cap.set(cv2.CAP_PROP_FPS, 30)  # shouldn't this be faster and camera dependent?
 
             width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
             height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -83,14 +83,15 @@ class CameraWorker(threading.Thread):
 
             if self.test_mode:
                 frame = self.test_image() if callable(self.test_image) else self.test_image.copy()
+                raw = self.test_image() if callable(self.test_image) else self.test_image.copy()
             else:
-                self.cap.grab()
-                ret, frame = self.cap.read()
+                self.cap.grab()  # TODO - see if this does in fact reduce latency - read is supposed to grab, so this could frame skip
+                ret, raw = self.cap.read()
                 if not ret:
                     print(f"[{self.name}] Frame grab failed")
                     time.sleep(0.05)
                     continue
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frame = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
 
             mask = self.compute_mask(frame)
             outlined, contours = self.draw_mask_outline(frame, mask)
@@ -100,7 +101,8 @@ class CameraWorker(threading.Thread):
                 'image': frame,
                 'mask': mask,
                 'outlined': outlined,
-                'contours': contours
+                'contours': contours,
+                'raw': raw
             }
 
             for q in [self.data_queue, self.view_queue]:
