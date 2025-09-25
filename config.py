@@ -14,7 +14,8 @@ CAMERAS = [
     {
         'id': 'cam1',
         'enabled': True,
-        'source': static_test_grid,
+        # usually source for cam1 is "/dev/video0"
+        'source': static_test_grid,  # Use function static_test_grid instead of path string
         'resolution': (1280, 720),
         # The pipeline is now simpler: just grab and find contours.
         'pipeline': ['process_contours'],
@@ -23,7 +24,8 @@ CAMERAS = [
     {
         'id': 'cam2',
         'enabled': True,
-        'source': dynamic_test_image,
+        # usually this is "/dev/video2"
+        'source': dynamic_test_image,  # Use function dynamic_test_image instead of path string
         'resolution': (1280, 720),
         'pipeline': ['process_contours'],
         'overlay_color': (0, 0, 255),

@@ -1,101 +1,100 @@
-# DARKVIEW 
-A Dual-Camera Fusion Vision System suitable for imaging solar events, welding and other high-brightness targets
+# Darkview - Multi-Camera Processing Framework
 
-This project implements a high-performance, multi-threaded image acquisition and fusion pipeline using two USB or Pi cameras on a Raspberry Pi. The system supports auto-exposure tuning, contour detection, and real-time visualization via a Flask-based web server. A fusion thread combines the two camera views into a synchronized composite stream, with masking and contour overlays.
-
-Designed originally for use in robotics and real-time inspection, this version (V5) includes clean thread isolation, shared-state coordination, and test-mode support using synthetic images.
-
-Some of the docs for the dual arducam are [general pi camera stuff](https://docs.arducam.com/Raspberry-Pi-Camera/Pivariety-Camera/Quick-Start-Guide/) and [exposure time](https://docs.arducam.com/UVC-Camera/Adjust-the-minimum-exposure-time/).
+Darkview is a scalable, configuration-driven Python framework for capturing and processing multiple simultaneous camera streams. It provides a dynamic web interface for live viewing and recording of raw or processed video feeds.
 
 ---
 
-## Overview
+## Features
 
-- Camera Threads (`CameraWorker`) capture grayscale images, compute saturation masks, and generate outlined overlays.
-- Fusion Thread synchronizes and combines the two camera streams, masking and drawing outlines for both views.
-- Flask Web Server provides live viewing via `/stream`, and supports view switching and auto-exposure tuning.
-- Shared State handles thread startup and communication, including test modes for development without hardware.
-- Auto-Exposure Tuning adjusts camera settings dynamically to avoid overexposure based on mask coverage.
-
----
-
-## File Descriptions
-
-### camera_control.py
-- Provides utility functions for setting v4l2 camera parameters
-- Includes `auto_exposure_tune()` [experimental!] to scan and apply the best exposure based on mask saturation threshold
-
-### camera_thread_queue.py
-- Defines the `CameraWorker` thread class
-- Captures grayscale frames from camera or test image
-- Computes saturation mask and draws contours
-- Pushes processed frames into an output queue (`maxsize=1`)
-- Includes signal handler for clean `Ctrl+C` termination
-- Also provides sample static/dynamic test image generators
-
-### flask_server.py
-- Hosts the web dashboard with view controls and a live MJPEG stream
-- Endpoints:
-  - `/` : main page with buttons to switch views and auto-tune cam2
-  - `/stream` : MJPEG video stream (cam1, cam2, or fusion)
-  - `/set_mode` : updates view mode
-  - `/tune_cam2_exposure` : pauses cam2, tunes exposure, then resumes
-- Uses `data_lock` and `update_cam1`, `update_cam2`, `update_fusion` for safe shared state updates
-
-### fusion_worker.py
-- Defines the `FusionWorker` thread class
-- Synchronizes frames from cam1 and cam2 queues based on timestamp skew
-- Trims non-overlapping regions, fuses images using mask from cam1
-- Draws contours from both masks in colored overlays
-- Re-pads fused image to full resolution for clean viewing
-
-### main.py
-- Launches all threads: cam1, cam2, fusion, and Flask feeder
-- Registers SIGINT handler to stop all threads cleanly
-- The Flask feeder thread continuously pulls the most recent frames and updates the web UI state
-- Entry point for running the whole system
-
-### shared_state.py
-- Central config and thread construction
-- Defines camera resolutions, saturation thresholds, and test mode sources
-- Instantiates `CameraWorker` threads (cam1, cam2) and `FusionWorker`
-- Defines `cam1_queue`, `cam2_queue`, and `fusion_queue` (all `Queue(maxsize=1)`)
-- Allows switching between live camera and static test sources
+- **Multi-Camera Support**: Easily configure and run multiple camera pipelines in parallel.
+- **Dynamic Web Interface**: A web UI that automatically updates to display all active camera and processed streams.
+- **Live Stream Fusion**: A dedicated worker that can synchronize and fuse the video from two source cameras into a single composite view.
+- **Flexible Processing Pipelines**: Define a unique chain of processing steps for each camera through a simple configuration file.
+- **Multi-Stream Recording**: Select any combination of raw or processed streams from the UI and record them simultaneously to MP4 files.
+- **Test Mode**: Run the framework without physical cameras by using built-in synthetic image generators.
 
 ---
 
-## Getting Started
+## Architecture Overview
 
-### Requirements
-- Python 3.7+
-- OpenCV (`cv2`)
-- Flask
-- NumPy
-- v4l2 (Linux only, for auto-exposure)
+The framework is designed with a modular, multi-threaded architecture that separates concerns into distinct components. This makes the system easy to extend and maintain.
 
-### Run the System
+- **`main.py`**: The main entry point. Contains the `ApplicationManager` class, which reads the configuration and orchestrates the entire application lifecycle (startup and shutdown).
 
-    python3 main.py
+- **`config.py`**: The central configuration file. This is where you define all cameras, their processing pipelines, and fusion settings. The entire application is driven by the data in this file.
 
-Then open your browser to `http://<raspberry-pi-ip>:5000`
+- **`workers.py`**: Contains the individual, single-purpose processing units of the framework. Each worker is a thread that performs a specific task (e.g., grabbing frames, finding contours, applying filters).
+    - `FrameGrabber`: Connects to a camera and captures raw frames.
+    - `ContourProcessor`: Finds and draws saturation-based contours.
+    - `FinalProcessor`: Applies post-processing (like CLAHE) and draws final overlays on the fused image.
 
-### Run in Test Mode
-To try w/p a camera, `shared_state.py` can set `USE_TEST_MODE = True`. This uses synthetic images and allows rapid development with no hardware.
+- **`pipeline.py`**: Defines the `CameraPipeline` class. This class reads a camera's configuration and dynamically constructs a chain of workers and queues to form that camera's processing pipeline.
 
----
+- **`fusion_worker.py`**: Contains the `FusionWorker`, which is responsible for synchronizing and compositing the grayscale images from two source pipelines.
 
-## Web Interface Controls (flask)
+- **`flask_server.py`**: Manages the web interface. It serves the main HTML page and provides dynamic routes for video streaming (`/stream/<stream_id>`) and recording control.
 
-- **Switch Views**: Click `Cam1`, `Cam2`, or `Fusion` to switch output stream
-- **Tune Exposure**: Click `Auto Tune Cam2 Exposure` to dynamically adjust cam2 exposure
-- **Record Movie**: Click `Record` and a 10s video will be saved to the clips folder with a timestamp
----
+- **`recorder.py`**: A generic, stream-agnostic recording service. It can handle multiple simultaneous recording requests for any available stream and frame type.
 
-## Notes
+- **`shared_state.py`**: Defines the global, thread-safe data structures (like the shutdown event and data dictionaries) that allow the different modules to communicate.
 
-- Fusion logic assumes both images are grayscale and the same resolution
-- Frame queues have `maxsize=1` to always store the latest frame
-- Timestamp skew threshold in fusion is set to 50ms to avoid combining mismatched frames
+- **`utils.py`**: A collection of general-purpose helper functions, such as the FPS monitor and synthetic test image generators.
+
+- **`templates/index.html`**: The Jinja2 template for the web interface. It dynamically generates controls based on the streams provided by the Flask server.
 
 ---
 
+## Configuration
+
+All application behavior is controlled by `config.py`.
+
+### Adding a Camera
+
+To add a new camera, simply add a new dictionary to the `CAMERAS` list:
+
+```python
+CAMERAS = [
+    {
+        'id': 'cam1',
+        'enabled': True,
+        'source': '/dev/video0',
+        'resolution': (1280, 720),
+        'pipeline': ['process_contours'],
+        'overlay_color': (255, 0, 0),
+    },
+    # ... add more cameras here ...
+]
+```
+
+### Enabling Test Mode
+
+To run a camera in test mode without hardware, import a test generator function from `utils.py` and set it as the `source`:
+
+```python
+from utils import static_test_grid
+
+CAMERAS = [
+    {
+        'id': 'cam1',
+        'enabled': True,
+        'source': static_test_grid, # Use function instead of path string
+        # ...
+    },
+]
+```
+
+### Configuring Fusion
+
+The `FUSION_CONFIG` dictionary controls the fusion process. You can specify which two cameras to use as sources and configure post-processing settings like CLAHE.
+
+---
+
+## How to Run
+
+1.  Install the required Python packages (e.g., `Flask`, `opencv-python`, `numpy`).
+2.  Configure your cameras and pipelines in `config.py`.
+3.  Run the main application from your terminal:
+    ```bash
+    python main.py
+    ```
+4.  Open a web browser and navigate to `http://0.0.0.0:5000` to view the live interface.
