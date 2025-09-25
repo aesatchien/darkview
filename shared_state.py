@@ -6,6 +6,7 @@ This has been refactored to support a generic, scalable pipeline architecture.
 
 Responsibilities:
 - Defines the global shutdown event.
+- Defines an event to control the web stream feeder.
 - Defines the global data structures for pipeline management and web streaming.
 """
 
@@ -14,6 +15,12 @@ import queue
 
 # --- Global Shutdown Event ---
 shutdown_requested = threading.Event()
+
+# --- Feeder Control Event ---
+# An event to signal the stream_feeder thread to pause its operation.
+# This allows other parts of the application to safely access frame queues
+# without contention from the web view feeder.
+feeder_paused = threading.Event()
 
 
 # --- Global Data Structures ---

@@ -73,8 +73,8 @@ class FusionWorker(threading.Thread):
                 output_data = {
                     'timestamp': time.time(),
                     'fused_gray': padded_fused_gray,
-                    'contours1': self.shift_contours(data1['contours'], dx=-self.overlap_trim_x, dy=0),
-                    'contours2': self.shift_contours(data2['contours'], dx=0, dy=+self.overlap_trim_y),
+                    'contours1': self.shift_contours(data1['contours'], dx=0, dy=0),
+                    'contours2': self.shift_contours(data2['contours'], dx=self.overlap_trim_x, dy=self.overlap_trim_y),
                     'color1': data1.get('overlay_color', (255, 0, 0)),
                     'color2': data2.get('overlay_color', (0, 0, 255)),
                 }

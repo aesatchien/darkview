@@ -9,14 +9,15 @@ The camera pipelines have been simplified to offload CLAHE processing until afte
 from utils import static_test_grid, dynamic_test_image
 
 # --- New, Scalable Configuration Structure ---
-
+resolution = (640, 480)  #  (1280, 720)
 CAMERAS = [
     {
         'id': 'cam1',
         'enabled': True,
         # usually source for cam1 is "/dev/video0"
-        'source': static_test_grid,  # Use function static_test_grid instead of path string
-        'resolution': (1280, 720),
+        # 'source': static_test_grid,  # Use function static_test_grid instead of path string
+        'source': "/dev/video0",
+        'resolution': resolution,
         # The pipeline is now simpler: just grab and find contours.
         'pipeline': ['process_contours'],
         'overlay_color': (255, 0, 0),
@@ -25,8 +26,9 @@ CAMERAS = [
         'id': 'cam2',
         'enabled': True,
         # usually this is "/dev/video2"
-        'source': dynamic_test_image,  # Use function dynamic_test_image instead of path string
-        'resolution': (1280, 720),
+        # 'source': dynamic_test_image,  # Use function dynamic_test_image instead of path string
+        'source': "/dev/video2",
+        'resolution': resolution,
         'pipeline': ['process_contours'],
         'overlay_color': (0, 0, 255),
     },
@@ -36,7 +38,7 @@ CAMERAS = [
 FUSION_CONFIG = {
     'enabled': True,
     'sources': ['cam1', 'cam2'],
-    'overlap_trim_x': 48,
+    'overlap_trim_x': 9 ,  # 48 when objects are close (1m), 9 when far (4m)
     'overlap_trim_y': -48,
     # CLAHE settings are now part of the fusion process, applied by FinalProcessor.
     'clahe_clip_limit': 4.0,

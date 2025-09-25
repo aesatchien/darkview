@@ -89,3 +89,13 @@ def dynamic_test_image():
     cv2.rectangle(img, (t, 300), (t + 100, 500), 128, -1)
     cv2.rectangle(img, (t+100, 300), (t + 200, 500), 255, -1)
     return img
+
+# --- Alignment ---
+def estimate_shift(ref, mov):
+    # returns (dx, dy) so that translating mov by (-dx,-dy) aligns to ref
+    A = cv2.cvtColor(ref, cv2.COLOR_BGR2GRAY) if ref.ndim==3 else ref
+    B = cv2.cvtColor(mov, cv2.COLOR_BGR2GRAY) if mov.ndim==3 else mov
+    A, B = A.astype(np.float32), B.astype(np.float32)
+    win = cv2.createHanningWindow((A.shape[1], A.shape[0]), cv2.CV_32F)
+    (dx, dy), _ = cv2.phaseCorrelate(A*win, B*win)
+    return dx, dy
